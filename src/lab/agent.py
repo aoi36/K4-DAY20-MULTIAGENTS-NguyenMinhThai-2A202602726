@@ -4,12 +4,17 @@ Pseudo-code: guides/pseudocode/01_agent.md
 Kiểm tra:    pytest tests/test_02_agent.py
 """
 from pathlib import Path
+import os
+import sys
+import shutil
+import subprocess
 
-# TODO 1: import các thành phần cần dùng, ví dụ:
-#   from deepagents import create_deep_agent
-#   from deepagents.backends import LocalShellBackend
-#   from .model import make_model
-#   from .subagents import get_subagents
+from deepagents import create_deep_agent
+from deepagents.backends import LocalShellBackend
+from deepagents.backends.protocol import ExecuteResponse
+
+from .model import make_model
+from .subagents import get_subagents
 
 # ---- CÓ SẴN, KHÔNG SỬA: system prompt dùng chung cho mọi sinh viên (để đường cơ sở so sánh được) ----
 PATHS_NOTE = (
@@ -38,6 +43,25 @@ SUBAGENTS_NOTE = (
 # --------------------------------------------------------------------------------------------------
 
 
+class _WindowsShellBackend(LocalShellBackend):
+    def execute(self, command: str, *, timeout: int | None = None) -> ExecuteResponse:
+        bash = shutil.which("git.exe")
+        if not bash:
+            return super().execute(command, timeout=timeout)
+        bash = Path(bash).parent.parent / "bin" / "bash.exe"
+        if not bash.exists():
+            return super().execute(command, timeout=timeout)
+        try:
+            result = subprocess.run([str(bash), "--noprofile", "--norc", "-c", command],
+                                    cwd=self.cwd, env=self._env, capture_output=True, text=True,
+                                    timeout=timeout or self._default_timeout, stdin=subprocess.DEVNULL)
+            output = result.stdout + result.stderr
+            return ExecuteResponse(output=output[:self._max_output_bytes], exit_code=result.returncode,
+                                   truncated=len(output) > self._max_output_bytes)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return ExecuteResponse(output=str(exc), exit_code=1, truncated=False)
+
+
 def make_backend(sandbox: Path):
     """Tạo backend (môi trường thực thi) cho tác tử.
 
@@ -47,7 +71,12 @@ def make_backend(sandbox: Path):
       - Tác tử chạy được lệnh shell và gọi được `python` (cần đặt PATH).
       - KHÔNG chuyển biến môi trường của bạn vào shell của tác tử (khóa API không được lộ).
     """
-    raise NotImplementedError("TODO 2: cài đặt make_backend (xem guides/pseudocode/01_agent.md)")
+    return (_WindowsShellBackend if os.name == "nt" else LocalShellBackend)(
+        root_dir=sandbox, virtual_mode=True, inherit_env=False,
+        env={"PATH": os.pathsep.join((str(Path(sys.executable).parent), os.defpath)), "SystemRoot": os.environ.get("SystemRoot", ""),
+             "HOME": str(sandbox), "PYTHONDONTWRITEBYTECODE": "1"},
+        timeout=120,
+    )
 
 
 def build_agent(sandbox: Path, mode: str = "single", use_skills: bool = False, model=None):
@@ -64,4 +93,16 @@ def build_agent(sandbox: Path, mode: str = "single", use_skills: bool = False, m
     mode không hợp lệ -> ném ValueError.
     Trả về: đồ thị (graph) đã biên dịch, gọi bằng `.invoke({"messages": [...]})`.
     """
-    raise NotImplementedError("TODO 3: cài đặt build_agent (xem guides/pseudocode/01_agent.md)")
+    if mode not in ("single", "subagents"):
+        raise ValueError(f"unsupported mode: {mode}")
+    kwargs = {}
+    prompt = BASE_PROMPT
+    if mode == "subagents":
+        kwargs["subagents"] = [{**sub, "system_prompt": sub["system_prompt"] + " " + PATHS_NOTE}
+                               for sub in get_subagents()]
+        prompt += SUBAGENTS_NOTE
+    if use_skills:
+        kwargs["skills"] = ["/skills/"]
+        prompt += SKILLS_NOTE
+    return create_deep_agent(model=model if model is not None else make_model(), system_prompt=prompt,
+                             backend=make_backend(sandbox), **kwargs)
