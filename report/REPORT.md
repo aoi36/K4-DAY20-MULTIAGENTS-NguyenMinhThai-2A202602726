@@ -11,7 +11,7 @@
 - Nhà cung cấp và mô hình: ban đầu `google_genai:gemini-2.5-flash` (hết hạn mức), sau đó `google_genai:gemini-3.5-flash-lite`; nhiệt độ cấu hình 0 (model mới bỏ qua nhiệt độ), `recursion_limit` mặc định 60 (thử lại `code-learn` với 120).
 - Deep Agents 0.7.21 (theo `pyproject.toml`), Windows, chạy trực tiếp trong `.venv`.
 - Đã chạy nhiều lượt học `baseline`, `subagents`, `skills-auto`; một số lượt 429 theo hạn mức 15 yêu cầu/phút của model mới. Ba kết quả `baseline` và `subagents` cuối không có lỗi. `baseline` và `subagents` học dùng `gemini-3.5-flash-lite` sau các lần thử đầu; `skills-auto` Phần 3.4 chưa đủ ba lượt.
-- Commit của tag `freeze`: chờ commit giả thuyết ở Phần 4.0; đã sinh và đánh giá skill.
+- Commit của tag `freeze`: `74716c5` (giả thuyết commit trước đó: `2c698a3`).
 
 ## 2. Giả thuyết (commit TRƯỚC tag `freeze`, Phần 4.0)
 
@@ -19,7 +19,7 @@
 
 - H1 (subagents so với baseline): Dự đoán không tăng điểm trung bình tác vụ đánh giá: cả ba tác vụ học đạt bằng điểm baseline (6/10, 5/8, 6/9) dù `subagents` tốn nhiều token hơn (275.313/536.682/185.493 so với 158.468/278.079/78.520).
 - H2 (skills-auto so với baseline): Dự đoán không tăng điểm đánh giá rõ rệt: Phần 3.4 trên tác vụ học đạt 6/10, 5/8, 6/9 (bằng baseline); `code-learn` không đọc skill (`skills_read=0`), `data-learn` đọc 2, `logs-learn` đọc 1 mà không tăng điểm.
-- H3 (tác vụ học so với tác vụ đánh giá): Dự đoán điểm đánh giá thấp hơn điểm học vì có thêm quy ước mới chưa xuất hiện trong phản hồi học; cần so sánh khi có kết quả đánh giá. Chưa commit giả thuyết/chưa tag `freeze` vì Phần 3.4 chưa hoàn tất.
+- H3 (tác vụ học so với tác vụ đánh giá): Dự đoán điểm đánh giá thấp hơn điểm học vì có thêm quy ước mới chưa xuất hiện trong phản hồi học; bản giả thuyết này đã được commit trước tag `freeze`.
 
 ## 3. Làm quen Deep Agents (Phần 0.3)
 
@@ -67,34 +67,50 @@ Nhận xét: `baseline` hiện đạt `code-learn` 6/10, `data-learn` 5/8, `logs
 > Dán nội dung `report/table.md` và kết quả `python scripts/check_breakdown.py`. Nêu các lần chạy có `error` hoặc `skills_modified = true` (nếu có) và cách xử lý.
 
 ```text
-(dán bảng ở đây)
+Tạm thời (chưa có kết quả đánh giá subagents hoặc skills-auto):
+| Task | baseline | subagents |
+|---|---|---|
+| code-learn | 6/10 | 6/10 |
+| data-learn | 5/8 | 5/8 |
+| logs-learn | 6/9 | 6/9 |
+| code-eval | 6/11 | - |
+| data-eval | 5/9 | - |
+| logs-eval | 6/10 | - |
+| Mean score - learning tasks | 0.63 | 0.63 |
+| Mean score - evaluation tasks | 0.57 | - |
+| Mean tokens per run | 153,992 | 332,496 |
+
+check_breakdown.py: baseline learn technical 17/18, rule 0/9; baseline eval technical 17/18, rule 0/12; subagents learn technical 17/18, rule 0/9.
 ```
 
 ## 8. Phân tích
 
 > Trả lời từng câu bằng số liệu từ mục 7 và bằng chứng từ vết. Kết quả âm hoặc không có khác biệt vẫn hợp lệ nếu được phân tích tốt.
 
-1. So với `baseline`, điều kiện nào cải thiện điểm tác vụ **học**? Điều kiện nào cải thiện điểm tác vụ **đánh giá**? Có điều kiện nào cải thiện tác vụ học nhưng không cải thiện tác vụ đánh giá? Nếu có, đó là dấu hiệu gì?
-2. Tách điểm thành check kỹ thuật và check quy ước (`rule_`). Skill do curator sinh giúp nhóm check nào? Check quy ước **mới** của tác vụ đánh giá có được skill giúp không, và vì sao?
-3. Dựa vào vết và `skills_read`, giải thích một check mà skill giúp đạt và một check mà skill không giúp (skill chưa được đọc, đọc nhưng không làm theo, skill thiếu hoặc sai).
-4. Chi phí: so sánh số token trung bình giữa các điều kiện. Điều kiện nào có hiệu quả tốt nhất theo điểm trên mỗi token? Đa tác tử có đáng chi phí trong thí nghiệm này không?
-5. Có dấu hiệu rò rỉ dữ liệu hoặc quá khớp nào trong skill sinh ra không? Nhóm đã phòng tránh như thế nào?
-6. Nhiễu: so sánh điểm tác vụ học của cùng bộ skill ở Phần 3.4 (đã sao lưu) và sau đóng băng. Chênh lệch bao nhiêu? Nó cho biết điều gì về độ tin cậy của các chênh lệch trong bảng ở mục 7?
+1. Trên tác vụ học, `subagents` và `skills-auto-dev` cùng đạt 6/10, 5/8, 6/9 như `baseline`; chưa có đủ điểm đánh giá hai điều kiện còn lại để kết luận về chuyển giao.
+2. `baseline` đạt check kỹ thuật 17/18 trên cả học và đánh giá, check quy ước 0/9 và 0/12; `subagents` học cũng 17/18 và 0/9. Trong thử nghiệm trước đóng băng, skill chưa cải thiện điểm tổng; check quy ước mới của đánh giá không xuất hiện trong prompt curator nên không thể giả định skill giúp được.
+3. `code-learn` `skills_read=0`: ba check `rule_` trượt; `logs-learn` đọc một skill mà vẫn trượt `rule_service_names`, `rule_sorted_errors`, `rule_schema_header`. Chưa có ví dụ check quy ước *được skill giúp đạt* trong dữ liệu hiện có.
+4. Token trung bình `baseline` 153.992/lượt (6 lượt), `subagents` 332.496/lượt (3 lượt học), trong khi điểm học trung bình đều 0,63; trên tập học, `baseline` tiết kiệm hơn. Chưa có token `skills-auto` sau đóng băng để xếp hạng đầy đủ.
+5. Hai skill qua `validate_skill` (không chứa định danh chỉ có ở đánh giá); tuy nhiên skill dữ liệu có ví dụ số tiền và cách 'cast to integers' thiếu an toàn về độ chính xác. Chưa có bằng chứng rò rỉ định danh; rủi ro quá khớp quy ước học vẫn còn.
+6. Bản sao `results/skills-auto-dev/` ghi 6/10, 5/8, 6/9; chưa chạy lại sau đóng băng vì quota, nên chưa đo được chênh lệch nhiễu. Không gán khác biệt chưa đo thành tác dụng của skill.
 
 ## 9. Hạn chế và tính hợp lệ
 
 > Nêu ít nhất 3 hạn chế và ảnh hưởng của từng hạn chế đến kết luận (ví dụ: chỉ 3 tác vụ mỗi vai trò, mỗi cấu hình chạy một lần, nhiễu của mô hình, tác vụ do giảng viên thiết kế sẵn quy ước, chỉ một mô hình).
 
-1.
-2.
-3.
+1. Chỉ ba tác vụ mỗi vai trò: chênh lệch một check có thể làm thay đổi đáng kể điểm trung bình, khó suy rộng.
+2. Mỗi điều kiện/tác vụ chỉ có một lượt hợp lệ: nhiễu mô hình và giới hạn gọi API ảnh hưởng kết luận; cần lặp nhiều lần khi quota phục hồi.
+3. Dùng một nhà cung cấp và thay model giữa thử nghiệm ban đầu và lượt hợp lệ: kết luận chỉ áp dụng cho cấu hình sau cùng; không gộp số liệu model cũ.
+4. Quy ước chấm do lab thiết kế và không có trong instruction: check `rule_` đo khả năng suy từ phản hồi và skill hơn là làm đúng chỉ dẫn công khai.
 
 ## 10. Kết luận
 
 > Tối đa 5 câu. Chỉ khẳng định điều số liệu hỗ trợ. Nêu một đề xuất cải tiến tiếp theo.
 
+Hai cấu hình `baseline` và `subagents` cùng đạt 0,63 trung bình trên tác vụ học, nhưng `subagents` tốn nhiều hơn gấp đôi token. Skill do curator sinh hợp lệ về cấu trúc, song chưa cải thiện điểm ở lần kiểm tra trước đóng băng. Vì quota 429 cản trở các lượt đánh giá còn lại, chưa thể kết luận về hiệu quả trên tác vụ mới. Bước tiếp theo là chạy lại các lượt còn thiếu trên cùng model sau khi quota phục hồi, rồi kiểm tra freeze và so sánh với số liệu học đã sao lưu.
+
 ## Phụ lục
 
 - Lệnh đã chạy (theo thứ tự):
 - Thử thách mở rộng (nếu có): hướng chọn, kết quả, nhận xét.
-- Ghi chú khác: Chưa hoàn thành Phần 3.4–5: `skills-auto`/`data-learn` không kết thúc sau nhiều phút nên đã dừng; lượt `subagents`/`code-learn` và `data-learn` bị 429. Chưa chạy tác vụ đánh giá, chưa tạo bảng tổng hợp hoặc tag `freeze`; các mục 7–10 cần số liệu thật, không tự điền giả. Khi có quota ổn định, chạy lại các lượt học lỗi trên cùng mô hình, kiểm tra skill, lưu `results/skills-auto-dev`, rồi mới commit `hypotheses` và đóng băng theo GUIDE.
+- Ghi chú khác: Đã hoàn thành các lượt học Phần 3.4 và lưu `results/skills-auto-dev/`; đã commit giả thuyết và tag `freeze`. Ba lượt đánh giá `baseline` hợp lệ, nhưng `subagents/code-eval` và `data-eval` bị 429 do hết 500 yêu cầu/ngày; đã bỏ hai bản ghi lỗi và dừng trước `logs-eval`. Chưa chạy `skills-auto` chính thức và chưa thể hoàn thành bảng 3 điều kiện; cần chờ quota hồi phục, chạy lại `subagents --tasks eval`, rồi `skills-auto --tasks all`, kiểm tra `verify_freeze.py`, lập bảng và hoàn tất phân tích.
